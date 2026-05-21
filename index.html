@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#2563eb">
+<meta name="theme-color" content="#E24B4A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Agustin Aprende</title>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -13,57 +13,146 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-*{font-family:'Nunito',sans-serif}
+*{font-family:'Nunito',sans-serif;box-sizing:border-box;margin:0}
 body{background:#f0f4ff;margin:0}
-@keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 12px rgba(34,197,94,0)}}
-.tp{animation:pg 2s infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+@keyframes pop{0%{transform:scale(0)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 12px rgba(34,197,94,0)}}
+@keyframes wave{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes tearfall{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(8px)}}
+.a-bounce{animation:bounce .5s ease 3}
+.a-wiggle{animation:wiggle .4s ease 5}
+.a-pop{animation:pop .6s ease 1}
+.timer-pulse{animation:pulse 2s infinite}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useCallback}=React;
+const {useState,useEffect,useCallback,useRef}=React;
 const sb=window.supabase.createClient('https://iqiplouocwzkjfohrykm.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxaXBsb3VvY3d6a2pmb2hyeWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMTkzNTUsImV4cCI6MjA5NDg5NTM1NX0.VP25DZDmuXBnP8VVUO3qG2q3VNRQSu3q_2-gJkJXbvg');
 
+// SONIDOS
+const ax=typeof AudioContext!=='undefined'?new AudioContext():new webkitAudioContext();
+function snd(freqs,type,vol,dur){if(ax.state==='suspended')ax.resume();freqs.forEach((f,i)=>{const o=ax.createOscillator(),g=ax.createGain();o.connect(g);g.connect(ax.destination);o.type=type;o.frequency.setValueAtTime(f,ax.currentTime+i*.1);g.gain.setValueAtTime(vol,ax.currentTime+i*.1);g.gain.exponentialRampToValueAtTime(.01,ax.currentTime+i*.1+dur);o.start(ax.currentTime+i*.1);o.stop(ax.currentTime+i*.1+dur);})}
+const playStart=()=>snd([440,587,880],'square',.12,.25);
+const playOk=()=>snd([523,659,784],'square',.1,.15);
+const playBad=()=>snd([200,150],'sawtooth',.08,.3);
+const playWin=()=>snd([523,659,784,1047,1319],'square',.1,.2);
+const playAlarm=()=>snd([880,660,880,660,880],'square',.15,.2);
+
+// ROBOTS
+const ROBOTS=[
+{bg:'#F09595',bd:'#A32D2D',name:'Robot Rojo',msgs:['Muy bien!','Increible!','Eres genial!']},
+{bg:'#85B7EB',bd:'#185FA5',name:'Robot Azul',msgs:['Excelente!','Campeon!','Fantastico!']},
+{bg:'#C0DD97',bd:'#3B6D11',name:'Robot Verde',msgs:['Bravo!','Lo lograste!','Sigue asi!']},
+{bg:'#FAC775',bd:'#854F0B',name:'Robot Dorado',msgs:['Genial!','Perfecto!','Asombroso!']},
+{bg:'#ED93B1',bd:'#993556',name:'Robot Rosa',msgs:['Hermoso!','Maravilloso!','Espectacular!']},
+{bg:'#AFA9EC',bd:'#3C3489',name:'Robot Morado',msgs:['Brillante!','Superior!','Magistral!']}
+];
+let robotIdx=0;
+const nextRobot=()=>{const r=ROBOTS[robotIdx%ROBOTS.length];robotIdx++;return r;};
+const ANIMS=['a-bounce','a-wiggle','a-pop'];
+const rndAnim=()=>ANIMS[Math.floor(Math.random()*ANIMS.length)];
+
+function Robot({bg,bd,size=48,sad=false}){
+const s=size,bs=s*.75,hs=s*.58,es=s*.125;
+return(
+<div style={{position:'relative',width:s,height:s*1.2,display:'inline-block'}}>
+<div style={{width:bs,height:bs*.83,background:bg,border:`3px solid ${bd}`,borderRadius:s*.2,position:'absolute',bottom:0,left:(s-bs)/2}}/>
+<div style={{width:hs,height:hs*.75,background:bg,opacity:.8,border:`3px solid ${bd}`,borderRadius:`${s*.17}px ${s*.17}px ${s*.1}px ${s*.1}px`,position:'absolute',top:0,left:(s-hs)/2}}/>
+<div style={{width:es,height:es,background:'#fff',borderRadius:'50%',position:'absolute',top:s*.15,left:s*.28}}><div style={{width:es*.5,height:es*.5,background:'#222',borderRadius:'50%',position:'absolute',top:es*.2,left:es*.25}}/></div>
+<div style={{width:es,height:es,background:'#fff',borderRadius:'50%',position:'absolute',top:s*.15,right:s*.28}}><div style={{width:es*.5,height:es*.5,background:'#222',borderRadius:'50%',position:'absolute',top:es*.2,left:es*.25}}/></div>
+{sad?<div style={{width:s*.3,height:s*.12,borderTop:'3px solid #fff',borderRadius:`${s*.15}px ${s*.15}px 0 0`,position:'absolute',bottom:s*.35,left:s*.35}}/>:
+<div style={{width:s*.3,height:s*.12,borderBottom:'3px solid #fff',borderRadius:`0 0 ${s*.15}px ${s*.15}px`,position:'absolute',bottom:s*.38,left:s*.35}}/>}
+{sad&&<><div style={{width:4,height:8,background:'rgba(100,180,255,.8)',borderRadius:'0 0 4px 4px',position:'absolute',top:s*.42,left:s*.32,animation:'tearfall 1s ease infinite'}}/><div style={{width:4,height:8,background:'rgba(100,180,255,.8)',borderRadius:'0 0 4px 4px',position:'absolute',top:s*.42,right:s*.32,animation:'tearfall 1s ease infinite'}}/></>}
+</div>);
+}
+
+// DATOS HISTORICOS
+const HISTORY={
+'01-01':'Hoy es Ano Nuevo! El primer dia del ano.',
+'05-01':'Hoy es Dia del Trabajo. Se celebra a todos los trabajadores.',
+'05-21':'Hoy es el Dia de las Glorias Navales. Recordamos al capitan Arturo Prat, que fue muy valiente en la Batalla de Iquique en 1879. Su barco Esmeralda era chiquito pero el nunca se rindio.',
+'06-20':'Hoy es el Dia de los Pueblos Indigenas. Celebramos a los mapuches, aymaras y otros pueblos originarios de Chile.',
+'09-18':'Hoy son las Fiestas Patrias! Chile celebra su independencia con empanadas, cueca y juegos.',
+'09-19':'Hoy es el Dia de las Glorias del Ejercito. Se celebra con paradas militares.',
+'10-12':'Hoy es el Dia del Encuentro de Dos Mundos. Recordamos cuando los europeos llegaron a America.',
+'12-25':'Hoy es Navidad! Se celebra el nacimiento de Jesus.'
+};
+
 function App(){
-const [vista,setVista]=useState('dashboard');
+const [vista,setVista]=useState('hoy');
 const [progreso,setProgreso]=useState([]);
 const [actHoy,setActHoy]=useState([]);
 const [historial,setHistorial]=useState([]);
 const [cargando,setCargando]=useState(true);
 const [err,setErr]=useState(null);
+const [checkedIn,setCheckedIn]=useState(false);
+const [mood,setMood]=useState(null);
+
+// Timer
 const [enCurso,setEnCurso]=useState(null);
 const [tInicio,setTInicio]=useState(null);
 const [segs,setSegs]=useState(0);
+
+// Modals
 const [modalPreg,setModalPreg]=useState(null);
 const [modalReg,setModalReg]=useState(false);
 const [modalNotas,setModalNotas]=useState(null);
+const [celebData,setCelebData]=useState(null);
+
+// Pausa
+const [enPausa,setEnPausa]=useState(false);
+const [pausaInicio,setPausaInicio]=useState(null);
+const pausaRef=useRef(null);
+
 const hoy=new Date().toISOString().split('T')[0];
+const diaKey=(new Date().getMonth()+1).toString().padStart(2,'0')+'-'+new Date().getDate().toString().padStart(2,'0');
+const historyFact=HISTORY[diaKey]||null;
+
+const ic={'Matemática':'🔢','Caligrafía':'✍️','Sonidos':'🔊','Ciencias':'🧪','Historia':'📜','Lectura':'📖','Inglés':'🇬🇧'};
 
 const cargar=useCallback(async()=>{
-try{
-setCargando(true);setErr(null);
-const {data:p}=await sb.from('progreso').select('*').order('asignatura');
-const {data:c}=await sb.from('cronograma').select('*').eq('fecha',hoy).order('orden');
-const {data:a}=await sb.from('actividades').select('*').eq('fecha',hoy).order('created_at',{ascending:false});
+try{setCargando(true);setErr(null);
+const{data:p}=await sb.from('progreso').select('*').order('asignatura');
+const{data:c}=await sb.from('cronograma').select('*').eq('fecha',hoy).order('orden');
+const{data:a}=await sb.from('actividades').select('*').eq('fecha',hoy).order('created_at',{ascending:false});
 const h30=new Date();h30.setDate(h30.getDate()-30);
-const {data:h}=await sb.from('actividades').select('*').gte('fecha',h30.toISOString().split('T')[0]).order('fecha',{ascending:false});
+const{data:h}=await sb.from('actividades').select('*').gte('fecha',h30.toISOString().split('T')[0]).order('fecha',{ascending:false});
 setProgreso(p||[]);setActHoy(c||[]);setHistorial(h||[]);
 }catch(e){setErr('Error de conexion');}
 finally{setCargando(false);}
 },[hoy]);
 
 useEffect(()=>{cargar();},[cargar]);
+
+// Timer
+useEffect(()=>{let i;if(enCurso&&tInicio){i=setInterval(()=>setSegs(Math.floor((Date.now()-tInicio)/1000)),1000);}return()=>clearInterval(i);},[enCurso,tInicio]);
+
+// Alarma de pausa
 useEffect(()=>{
-let i;if(enCurso&&tInicio){i=setInterval(()=>setSegs(Math.floor((Date.now()-tInicio)/1000)),1000);}
-return()=>clearInterval(i);
-},[enCurso,tInicio]);
+if(enPausa&&pausaInicio){
+pausaRef.current=setInterval(()=>{
+const elapsed=Math.floor((Date.now()-pausaInicio)/1000);
+if(elapsed>=600&&elapsed%60===0){playAlarm();}
+},1000);
+}
+return()=>clearInterval(pausaRef.current);
+},[enPausa,pausaInicio]);
 
-const fmt=(s)=>{const m=Math.floor(s/60);return m+':'+String(s%60).padStart(2,'0');};
-const iniciar=(a)=>{setEnCurso(a);setTInicio(Date.now());setSegs(0);};
-const finalizar=()=>{if(!enCurso)return;setModalNotas({act:enCurso,dur:Math.max(1,Math.round(segs/60)),notas:'',comp:3});};
+const fmt=s=>{const m=Math.floor(s/60);return m+':'+String(s%60).padStart(2,'0');};
 
-const guardar=async(d)=>{
+const iniciar=act=>{playStart();setEnCurso(act);setTInicio(Date.now());setSegs(0);};
+
+const finalizar=()=>{
+if(!enCurso)return;
+const dur=Math.max(1,Math.round(segs/60));
+setModalNotas({act:enCurso,dur,notas:'',comp:3});
+};
+
+const guardar=async d=>{
 try{
 const a=d.act;
 const pD=a.paginas?parseInt(a.paginas.split('-')[0]):null;
@@ -73,15 +162,19 @@ await sb.from('actividades').insert({fecha:hoy,asignatura:a.asignatura,titulo:a.
 const pr=progreso.find(p=>p.asignatura===a.asignatura);
 if(pr){await sb.from('progreso').update({paginas_completadas:pr.paginas_completadas+nP,actividades_completadas:pr.actividades_completadas+1,ultima_actividad:hoy,updated_at:new Date().toISOString()}).eq('asignatura',a.asignatura);}
 if(a.id){await sb.from('cronograma').update({completada:true}).eq('id',a.id);}
-setEnCurso(null);setTInicio(null);setSegs(0);setModalNotas(null);await cargar();
+setEnCurso(null);setTInicio(null);setSegs(0);setModalNotas(null);
+const r=nextRobot();setCelebData({robot:r,anim:rndAnim(),msg:r.name+': '+r.msgs[Math.floor(Math.random()*r.msgs.length)]});
+playWin();setTimeout(()=>setCelebData(null),4000);
+await cargar();
 }catch(e){alert('Error al guardar');}
 };
 
-const verPreg=async(c)=>{
-const {data}=await sb.from('preguntas').select('*').eq('clave',c).order('orden');
+const abrirPreg=async clave=>{
+const{data}=await sb.from('preguntas').select('*').eq('clave',clave).order('orden');
 setModalPreg(data||[]);
 };
 
+// Registro manual
 const [fm,setFm]=useState({asig:'',pags:'',dur:'',notas:'',comp:3});
 const guardarManual=async()=>{
 if(!fm.asig)return;
@@ -92,9 +185,14 @@ const nP=(pD&&pH)?(pH-pD+1):1;
 await sb.from('actividades').insert({fecha:hoy,asignatura:fm.asig,tipo:'libro',paginas_desde:pD,paginas_hasta:pH,duracion_minutos:parseInt(fm.dur)||0,notas:fm.notas||null,comprension:fm.comp,completada:true});
 const pr=progreso.find(p=>p.asignatura===fm.asig);
 if(pr){await sb.from('progreso').update({paginas_completadas:pr.paginas_completadas+nP,actividades_completadas:pr.actividades_completadas+1,ultima_actividad:hoy,updated_at:new Date().toISOString()}).eq('asignatura',fm.asig);}
-setFm({asig:'',pags:'',dur:'',notas:'',comp:3});setModalReg(false);await cargar();
+setFm({asig:'',pags:'',dur:'',notas:'',comp:3});setModalReg(false);
+const r=nextRobot();setCelebData({robot:r,anim:rndAnim(),msg:r.name+': '+r.msgs[Math.floor(Math.random()*r.msgs.length)]});
+playWin();setTimeout(()=>setCelebData(null),4000);
+await cargar();
 }catch(e){alert('Error');}
 };
+
+const compHoy=historial.filter(h=>h.fecha===hoy);
 
 const refuerzo=progreso.map(p=>{
 const pct=p.paginas_total>0?Math.round(p.paginas_completadas/p.paginas_total*100):0;
@@ -104,62 +202,118 @@ return{...p,pct,niv:pct<20?'rojo':pct<50?'amarillo':'verde'};
 if(cargando)return(<div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="text-6xl mb-4">📚</div><div className="text-xl font-bold text-blue-800">Cargando...</div></div></div>);
 if(err)return(<div className="min-h-screen flex items-center justify-center p-4"><div className="text-center"><div className="text-5xl mb-4">⚠️</div><div className="text-red-800 font-bold mb-4">{err}</div><button onClick={cargar} className="px-6 py-2 bg-red-600 text-white rounded-lg">🔄 Reintentar</button></div></div>);
 
-const compHoy=historial.filter(h=>h.fecha===hoy);
-const ic={'Matemática':'🔢','Caligrafía':'✍️','Sonidos':'🔊','Ciencias':'🧪','Historia':'📜','Lectura':'📖','Inglés':'🇬🇧'};
+const fechaStr=new Date().toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 return(
-<div className="min-h-screen bg-blue-50 pb-24">
-<div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 shadow-lg">
-<h1 className="text-2xl font-extrabold">📚 Agustín Aprende</h1>
-<p className="text-blue-200 text-sm mt-1">{new Date().toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
-<div className="mt-2 flex gap-4 text-sm"><span>✅ {compHoy.length} completadas</span><span>📋 {actHoy.filter(a=>!a.completada).length} pendientes</span></div>
+<div className="min-h-screen pb-24" style={{background:'#f0f4ff'}}>
+{/* HEADER */}
+<div className="p-5 text-white relative overflow-hidden" style={{background:'linear-gradient(135deg,#A32D2D,#E24B4A)'}}>
+<div className="flex justify-between items-start">
+<div>
+<h1 className="text-xl font-extrabold">📚 Agustín Aprende</h1>
+<p className="text-sm opacity-90 mt-1">{fechaStr}</p>
+<p className="text-xs opacity-75 mt-1">Dia {Math.ceil((Date.now()-new Date('2026-05-21').getTime())/864e5)||1} de 154</p>
+</div>
+<div className="a-bounce"><Robot bg="#C0DD97" bd="#3B6D11" size={44}/></div>
+</div>
 </div>
 
-<div className="flex bg-white shadow-sm border-b sticky top-0 z-40">
-{[{k:'dashboard',i:'📊',l:'Hoy'},{k:'progreso',i:'📈',l:'Progreso'},{k:'historial',i:'📝',l:'Historial'},{k:'refuerzo',i:'🎯',l:'Reforzar'}].map(t=>(
-<button key={t.k} onClick={()=>setVista(t.k)} className={'flex-1 py-3 text-center text-sm font-bold '+(vista===t.k?'text-blue-700 bg-blue-50':'text-gray-500')} style={vista===t.k?{borderBottom:'3px solid #2563eb'}:{}}>{t.i} {t.l}</button>
+{/* NOMBRE EN ROJO */}
+<div className="mx-4 -mt-3 bg-white rounded-xl p-3 shadow-sm border-2 text-center" style={{borderColor:'#E24B4A'}}>
+<div className="text-lg font-extrabold tracking-wider" style={{color:'#A32D2D'}}>AGUSTÍN ELIÚ ESPINOZA MORALES</div>
+<div className="text-xs text-gray-500 mt-1">Lee tu nombre completo en voz alta</div>
+</div>
+
+{/* DATO HISTORICO */}
+{historyFact&&(
+<div className="mx-4 mt-3 bg-blue-50 rounded-xl p-4 border-l-4 border-blue-500">
+<div className="text-xs font-bold text-blue-700 mb-1">📅 ¿Sabías que hoy...?</div>
+<div className="text-sm text-blue-900">{historyFact}</div>
+</div>
+)}
+
+{/* TABS */}
+<div className="flex bg-white shadow-sm border-b sticky top-0 z-40 mt-3">
+{[{k:'hoy',i:'📊',l:'Hoy'},{k:'semana',i:'📅',l:'Semana'},{k:'progreso',i:'📈',l:'Progreso'},{k:'historial',i:'📝',l:'Historial'},{k:'refuerzo',i:'🎯',l:'Reforzar'}].map(t=>(
+<button key={t.k} onClick={()=>setVista(t.k)} className={'flex-1 py-3 text-center text-xs font-bold '+(vista===t.k?'text-red-700 bg-red-50':'text-gray-500')} style={vista===t.k?{borderBottom:'3px solid #E24B4A'}:{}}>{t.i}<br/>{t.l}</button>
 ))}
 </div>
 
 <div className="p-4 max-w-2xl mx-auto">
 
-{vista==='dashboard'&&(
-<div className="space-y-4">
-{enCurso&&(
-<div className="bg-green-50 border-2 border-green-500 rounded-2xl p-5 tp">
-<div className="flex justify-between items-start">
-<div><div className="text-xs font-bold text-green-600 uppercase">⏱️ En Curso</div>
-<div className="text-xl font-extrabold text-green-900 mt-1">{enCurso.asignatura}</div>
-{enCurso.titulo&&<div className="text-sm text-green-700">{enCurso.titulo}</div>}
-{enCurso.paginas&&<div className="text-sm text-green-600">Páginas {enCurso.paginas}</div>}
+{/* CHECK-IN EMOCIONAL */}
+{vista==='hoy'&&!checkedIn&&(
+<div className="bg-white rounded-xl shadow-sm p-5 mb-4">
+<div className="text-center mb-3"><Robot bg="#85B7EB" bd="#185FA5" size={56}/></div>
+<h3 className="text-center font-bold text-gray-800 mb-3">¿Cómo te sientes hoy, Agustín?</h3>
+<div className="grid grid-cols-4 gap-2">
+{[{m:'feliz',l:'😊 Feliz',c:'#E1F5EE',t:'#0F6E56'},{m:'tranquilo',l:'😌 Tranquilo',c:'#E6F1FB',t:'#185FA5'},{m:'cansado',l:'😴 Cansado',c:'#FAEEDA',t:'#854F0B'},{m:'noQuiero',l:'😤 No quiero',c:'#FCEBEB',t:'#A32D2D'}].map(o=>(
+<button key={o.m} onClick={()=>{setMood(o.m);setCheckedIn(true);playStart();}} className="p-3 rounded-xl text-center border" style={{background:o.c,borderColor:o.t+'33'}}>
+<div className="text-2xl">{o.l.split(' ')[0]}</div>
+<div className="text-xs font-semibold mt-1" style={{color:o.t}}>{o.l.split(' ')[1]}</div>
+</button>
+))}
 </div>
-<div className="text-right"><div className="text-4xl font-mono font-extrabold text-green-800">{fmt(segs)}</div><div className="text-xs text-green-600 mt-1">minutos</div></div>
-</div>
-<button onClick={finalizar} className="w-full mt-4 px-4 py-3 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700">⏹️ FINALIZAR ACTIVIDAD</button>
 </div>
 )}
 
-<div className="bg-white rounded-2xl shadow-sm p-5">
-<h2 className="text-lg font-extrabold text-gray-800 mb-4">📋 Actividades de Hoy</h2>
-{actHoy.length===0?(<div className="text-center py-8 text-gray-400"><div className="text-4xl mb-2">📅</div><p>No hay actividades para hoy</p></div>):(
+{vista==='hoy'&&checkedIn&&mood&&!enPausa&&(
+<>
+{(mood==='cansado'||mood==='noQuiero')&&(
+<div className="bg-amber-50 rounded-xl p-4 mb-4 border-l-4 border-amber-500">
+<div className="flex items-center gap-3">
+<Robot bg="#FAC775" bd="#854F0B" size={36} sad={true}/>
+<div className="text-sm text-amber-900">
+{mood==='cansado'?'Robot Dorado dice: Está bien estar cansado. Vamos suave hoy, paso a paso.':'Robot Dorado dice: Entiendo que no quieres, pero vamos a hacerlo cortito y entretenido!'}
+</div>
+</div>
+</div>
+)}
+
+{/* ACTIVIDAD EN CURSO */}
+{enCurso&&(
+<div className="bg-green-50 border-2 border-green-500 rounded-xl p-4 mb-4 timer-pulse">
+<div className="flex justify-between items-start">
+<div>
+<div className="text-xs font-bold text-green-600 uppercase">⏱️ En curso</div>
+<div className="text-lg font-extrabold text-green-900 mt-1">{enCurso.asignatura}</div>
+{enCurso.titulo&&<div className="text-sm text-green-700">{enCurso.titulo}</div>}
+{enCurso.paginas&&<div className="text-sm text-green-600">Páginas {enCurso.paginas}</div>}
+</div>
+<div className="text-right">
+<div className="text-3xl font-mono font-extrabold text-green-800">{fmt(segs)}</div>
+</div>
+</div>
+<button onClick={finalizar} className="w-full mt-3 py-3 bg-green-600 text-white rounded-xl font-bold text-lg">⏹️ FINALIZAR</button>
+</div>
+)}
+
+{/* ACTIVIDADES HOY */}
+<div className="bg-white rounded-xl shadow-sm p-5 mb-4">
+<h2 className="font-extrabold text-gray-800 mb-4">📋 Actividades de hoy</h2>
+{actHoy.length===0?(
+<div className="text-center py-8 text-gray-400"><p>No hay actividades programadas</p>
+<button onClick={()=>setModalReg(true)} className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold">➕ Registrar actividad</button>
+</div>
+):(
 <div className="space-y-3">
 {actHoy.map(act=>{
 const done=act.completada||compHoy.some(a=>a.asignatura===act.asignatura&&a.titulo===act.titulo);
 const ec=enCurso&&enCurso.id===act.id;
 return(
-<div key={act.id} className={'rounded-xl p-4 border-l-4 '+(done?'bg-gray-50 border-gray-300 opacity-70':ec?'bg-green-50 border-green-500':'bg-white border-blue-500 shadow-sm')}>
+<div key={act.id} className={'rounded-xl p-4 border-l-4 '+(done?'bg-gray-50 border-gray-300 opacity-60':ec?'bg-green-50 border-green-500':'bg-white border-red-400 shadow-sm')}>
 <div className="flex items-center gap-2">
 {done&&<span className="text-xl">✅</span>}
-<span className={'font-bold '+(done?'text-gray-500 line-through':'text-gray-800')}>{act.asignatura}</span>
-<span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{act.tiempo_estimado}</span>
+<span className={'font-bold '+(done?'text-gray-400 line-through':'text-gray-800')}>{ic[act.asignatura]||'📚'} {act.asignatura}</span>
+<span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full ml-auto">{act.tiempo_estimado}</span>
 </div>
 {act.paginas&&<div className="text-sm text-gray-500 mt-1">Páginas {act.paginas}</div>}
 {act.titulo&&<div className="text-sm text-gray-700 mt-1 font-medium">{act.titulo}</div>}
 {!done&&!ec&&(
 <div className="flex flex-wrap gap-2 mt-3">
 {act.link&&<a href={act.link} target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-red-500 text-white text-sm rounded-lg font-semibold">▶️ {act.tipo==='video'?'Ver Video':'Abrir'}</a>}
-{act.preguntas_clave&&<button onClick={()=>verPreg(act.preguntas_clave)} className="px-3 py-2 bg-amber-500 text-white text-sm rounded-lg font-semibold">❓ Preguntas</button>}
-{!enCurso&&<button onClick={()=>iniciar(act)} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg font-bold">▶️ INICIAR</button>}
+{act.preguntas_clave&&<button onClick={()=>abrirPreg(act.preguntas_clave)} className="px-3 py-2 bg-amber-500 text-white text-sm rounded-lg font-semibold">❓ Preguntas</button>}
+{!enCurso&&<button onClick={()=>iniciar(act)} className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg font-bold">▶️ INICIAR</button>}
 </div>
 )}
 </div>);
@@ -168,146 +322,241 @@ return(
 )}
 </div>
 
-<div className="bg-white rounded-2xl shadow-sm p-5">
-<h2 className="text-lg font-extrabold text-gray-800 mb-3">📈 Progreso</h2>
-<div className="space-y-2">
+{/* BOTON PAUSA */}
+<div className="text-center mb-4">
+<button onClick={()=>{setEnPausa(true);setPausaInicio(Date.now());}} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm font-semibold">😴 Necesito pausa</button>
+</div>
+
+{/* PROGRESO RAPIDO */}
+<div className="bg-white rounded-xl shadow-sm p-5">
+<h2 className="font-extrabold text-gray-800 mb-3">📈 Progreso</h2>
 {progreso.map(p=>{
 const pct=p.paginas_total>0?Math.round(p.paginas_completadas/p.paginas_total*100):0;
-return(<div key={p.id} className="flex items-center gap-3">
-<span className="text-sm font-semibold w-24 truncate">{ic[p.asignatura]||'📚'} {p.asignatura}</span>
-<div className="flex-1 bg-gray-200 rounded-full h-2.5"><div className="h-2.5 rounded-full" style={{width:pct+'%',backgroundColor:pct>=60?'#22c55e':pct>=30?'#f59e0b':'#ef4444'}}/></div>
-<span className="text-xs text-gray-500 w-12 text-right">{pct}%</span>
+return(
+<div key={p.id} className="flex items-center gap-2 mb-2">
+<span className="text-xs font-semibold w-20 truncate">{ic[p.asignatura]||'📚'} {p.asignatura}</span>
+<div className="flex-1 bg-gray-200 rounded-full h-2.5"><div className="h-2.5 rounded-full" style={{width:pct+'%',background:pct>=60?'#22c55e':pct>=30?'#f59e0b':'#ef4444'}}/></div>
+<span className="text-xs text-gray-500 w-10 text-right">{pct}%</span>
 </div>);
 })}
 </div>
+</>
+)}
+
+{/* PAUSA */}
+{vista==='hoy'&&enPausa&&(
+<div className="bg-purple-50 border-2 border-purple-400 rounded-xl p-5 text-center">
+<Robot bg="#AFA9EC" bd="#3C3489" size={56} sad={true}/>
+<h3 className="font-bold text-purple-800 mt-3">¿Qué necesitas, Agustín?</h3>
+<div className="grid grid-cols-3 gap-2 mt-4">
+{[{l:'🏃 Correr',t:'Ve a la caminadora!'},{l:'💧 Agua',t:'Toma agüita'},{l:'🎮 Jugar',t:'5 min y volvemos'}].map((o,i)=>(
+<button key={i} onClick={()=>{}} className="p-3 bg-white rounded-xl border text-center">
+<div className="text-2xl">{o.l.split(' ')[0]}</div>
+<div className="text-xs font-semibold mt-1">{o.l.split(' ')[1]}</div>
+</button>
+))}
+</div>
+<PauseTimer inicio={pausaInicio}/>
+<button onClick={()=>{setEnPausa(false);setPausaInicio(null);playStart();}} className="mt-4 px-6 py-3 bg-green-600 text-white rounded-xl font-bold">✅ Ya volví, seguir estudiando</button>
+</div>
+)}
+
+{/* SEMANA */}
+{vista==='semana'&&(
+<div className="space-y-4">
+<div className="bg-white rounded-xl shadow-sm p-5">
+<h2 className="font-extrabold text-gray-800 mb-2">📅 Plan semanal</h2>
+<p className="text-sm text-gray-500 mb-4">Meta: 22 semanas hasta el examen (19-30 octubre 2026)</p>
+<WeekView/>
 </div>
 </div>
 )}
 
+{/* PROGRESO */}
 {vista==='progreso'&&(
-<div className="space-y-4">
-<div className="bg-white rounded-2xl shadow-sm p-5">
-<h2 className="text-lg font-extrabold text-gray-800 mb-4">📊 Progreso Detallado</h2>
+<div className="bg-white rounded-xl shadow-sm p-5">
+<h2 className="font-extrabold text-gray-800 mb-4">📊 Progreso detallado</h2>
 {progreso.map(p=>{
 const pct=p.paginas_total>0?Math.round(p.paginas_completadas/p.paginas_total*100):0;
 const col=pct>=60?'#16a34a':pct>=30?'#d97706':'#dc2626';
-return(<div key={p.id} className="bg-gray-50 rounded-xl p-4 mb-3">
-<div className="flex justify-between items-center mb-2"><span className="text-lg font-bold">{ic[p.asignatura]||'📚'} {p.asignatura}</span><span className="text-2xl font-extrabold" style={{color:col}}>{pct}%</span></div>
-<div className="w-full bg-gray-200 rounded-full h-4 mb-2"><div className="h-4 rounded-full" style={{width:pct+'%',backgroundColor:col}}/></div>
+return(
+<div key={p.id} className="bg-gray-50 rounded-xl p-4 mb-3">
+<div className="flex justify-between items-center mb-2"><span className="font-bold">{ic[p.asignatura]||'📚'} {p.asignatura}</span><span className="text-2xl font-extrabold" style={{color:col}}>{pct}%</span></div>
+<div className="w-full bg-gray-200 rounded-full h-4 mb-2"><div className="h-4 rounded-full" style={{width:pct+'%',background:col}}/></div>
 <div className="flex justify-between text-xs text-gray-500"><span>{p.paginas_completadas}/{p.paginas_total}</span><span>{p.actividades_completadas} sesiones</span></div>
+{p.ultima_actividad&&<div className="text-xs text-gray-400 mt-1">Última: {new Date(p.ultima_actividad+'T12:00:00').toLocaleDateString('es-CL')}</div>}
 </div>);
 })}
-</div>
-<div className="bg-white rounded-2xl shadow-sm p-5">
-<h2 className="text-lg font-extrabold text-gray-800 mb-3">📅 Esta Semana</h2>
-<div className="grid grid-cols-2 gap-3">
-<div className="bg-blue-50 rounded-xl p-4 text-center"><div className="text-3xl font-extrabold text-blue-700">{historial.filter(h=>(Date.now()-new Date(h.fecha))/864e5<=7).length}</div><div className="text-xs text-blue-600 font-semibold">Actividades</div></div>
-<div className="bg-green-50 rounded-xl p-4 text-center"><div className="text-3xl font-extrabold text-green-700">{historial.filter(h=>(Date.now()-new Date(h.fecha))/864e5<=7).reduce((s,h)=>s+(h.duracion_minutos||0),0)} min</div><div className="text-xs text-green-600 font-semibold">Tiempo Total</div></div>
-</div>
+<div className="grid grid-cols-2 gap-3 mt-4">
+<div className="bg-blue-50 rounded-xl p-4 text-center"><div className="text-2xl font-extrabold text-blue-700">{historial.filter(h=>(Date.now()-new Date(h.fecha))/864e5<=7).length}</div><div className="text-xs text-blue-600">Esta semana</div></div>
+<div className="bg-green-50 rounded-xl p-4 text-center"><div className="text-2xl font-extrabold text-green-700">{historial.filter(h=>(Date.now()-new Date(h.fecha))/864e5<=7).reduce((s,h)=>s+(h.duracion_minutos||0),0)} min</div><div className="text-xs text-green-600">Tiempo total</div></div>
 </div>
 </div>
 )}
 
+{/* HISTORIAL */}
 {vista==='historial'&&(
-<div className="bg-white rounded-2xl shadow-sm p-5">
-<h2 className="text-lg font-extrabold text-gray-800 mb-4">📝 Diario de Aprendizaje</h2>
-{historial.length===0?(<div className="text-center py-8 text-gray-400"><p>Sin actividades registradas</p></div>):(
+<div className="bg-white rounded-xl shadow-sm p-5">
+<h2 className="font-extrabold text-gray-800 mb-4">📝 Diario de aprendizaje</h2>
+{historial.length===0?<p className="text-center py-8 text-gray-400">Sin registros</p>:(
 <div className="space-y-3">
 {Object.entries(historial.reduce((ac,a)=>{if(!ac[a.fecha])ac[a.fecha]=[];ac[a.fecha].push(a);return ac;},{})).map(([f,as])=>(
 <div key={f} className="border rounded-xl overflow-hidden">
-<div className="bg-blue-50 px-4 py-2 font-bold text-blue-800 text-sm">📅 {new Date(f+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}</div>
+<div className="bg-red-50 px-4 py-2 font-bold text-red-800 text-sm">📅 {new Date(f+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}</div>
 <div className="divide-y">{as.map(a=>(
 <div key={a.id} className="px-4 py-3">
 <div className="flex justify-between"><div><span className="font-bold">{a.asignatura}</span>{a.titulo&&<span className="text-gray-500 text-sm ml-2">• {a.titulo}</span>}</div>
-<div className="text-sm text-right">{a.duracion_minutos>0&&<div className="text-green-600 font-semibold">⏱️ {a.duracion_minutos}min</div>}{a.comprension&&<div className="text-amber-500">{'⭐'.repeat(a.comprension)}</div>}</div></div>
+<div className="text-sm text-right">{a.duracion_minutos>0&&<div className="text-green-600 font-semibold">⏱️ {a.duracion_minutos} min</div>}{a.comprension&&<div className="text-amber-500">{'⭐'.repeat(a.comprension)}</div>}</div></div>
 {a.paginas_desde&&<div className="text-xs text-gray-500 mt-1">Pág {a.paginas_desde}-{a.paginas_hasta}</div>}
 {a.notas&&<div className="text-sm mt-1 bg-yellow-50 p-2 rounded">💬 {a.notas}</div>}
 </div>
-))}</div>
-</div>
+))}</div></div>
 ))}
 </div>
 )}
 </div>
 )}
 
+{/* REFORZAR */}
 {vista==='refuerzo'&&(
-<div className="space-y-4">
-<div className="bg-white rounded-2xl shadow-sm p-5">
-<h2 className="text-lg font-extrabold text-gray-800 mb-4">🎯 Áreas a Reforzar</h2>
+<div className="bg-white rounded-xl shadow-sm p-5">
+<h2 className="font-extrabold text-gray-800 mb-4">🎯 Áreas a reforzar</h2>
 {refuerzo.map(r=>(
-<div key={r.id} className={'rounded-xl p-4 border-l-4 mb-3 '+(r.niv==='rojo'?'bg-red-50 border-red-500':r.niv==='amarillo'?'bg-amber-50 border-amber-500':'bg-green-50 border-green-500')}>
-<div className="flex justify-between items-center">
-<div><div className="font-bold">{r.asignatura}</div><div className="text-sm text-gray-600">{r.paginas_completadas}/{r.paginas_total} • {r.actividades_completadas} sesiones</div></div>
-<div className="text-right"><div className={'text-2xl font-extrabold '+(r.niv==='rojo'?'text-red-600':r.niv==='amarillo'?'text-amber-600':'text-green-600')}>{r.pct}%</div><div className="text-xs text-gray-500">{r.niv==='rojo'?'🔴 Prioridad':r.niv==='amarillo'?'🟡 Atención':'🟢 Bien'}</div></div>
-</div></div>
+<div key={r.id} className={'rounded-xl p-4 border-l-4 mb-3 flex items-center gap-3 '+(r.niv==='rojo'?'bg-red-50 border-red-500':r.niv==='amarillo'?'bg-amber-50 border-amber-500':'bg-green-50 border-green-500')}>
+<Robot bg={r.niv==='rojo'?'#F09595':r.niv==='amarillo'?'#FAC775':'#C0DD97'} bd={r.niv==='rojo'?'#A32D2D':r.niv==='amarillo'?'#854F0B':'#3B6D11'} size={36} sad={r.niv==='rojo'}/>
+<div className="flex-1">
+<div className="font-bold text-gray-800">{r.asignatura}</div>
+<div className="text-sm text-gray-600">{r.paginas_completadas}/{r.paginas_total} • {r.actividades_completadas} sesiones</div>
+{r.niv!=='verde'&&<div className="text-xs mt-1" style={{color:r.niv==='rojo'?'#A32D2D':'#854F0B'}}>{r.niv==='rojo'?'Robot dice: Necesitamos practicar más esto!':'Robot dice: Vamos bien, un poco más!'}</div>}
+</div>
+<div className="text-right"><div className={'text-xl font-extrabold '+(r.niv==='rojo'?'text-red-600':r.niv==='amarillo'?'text-amber-600':'text-green-600')}>{r.pct}%</div></div>
+</div>
 ))}
-</div>
-<div className="bg-white rounded-2xl shadow-sm p-5">
-<h2 className="text-lg font-extrabold text-gray-800 mb-3">🔥 Racha</h2>
-<div className="flex gap-1 flex-wrap">
-{Array.from({length:14},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(13-i));const f=d.toISOString().split('T')[0];const t=historial.some(h=>h.fecha===f);
-return(<div key={f} className={'w-8 h-8 rounded flex items-center justify-center text-xs font-bold '+(t?'bg-green-500 text-white':f===hoy?'bg-blue-100 text-blue-700 border-2 border-blue-400':'bg-gray-100 text-gray-400')}>{d.getDate()}</div>);
-})}
-</div>
-<div className="flex gap-4 mt-2 text-xs text-gray-500"><span>🟩 Estudió</span><span>⬜ No</span><span>🔵 Hoy</span></div>
+<div className="bg-white rounded-xl shadow-sm p-5 mt-4">
+<h3 className="font-bold text-gray-800 mb-3">🔥 Racha de estudio</h3>
+<div className="flex gap-1 flex-wrap">{Array.from({length:14},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(13-i));const f=d.toISOString().split('T')[0];const t=historial.some(h=>h.fecha===f);return(<div key={f} className={'w-8 h-8 rounded flex items-center justify-center text-xs font-bold '+(t?'bg-green-500 text-white':f===hoy?'bg-red-100 text-red-700 border-2 border-red-400':'bg-gray-100 text-gray-400')}>{d.getDate()}</div>);})}</div>
+<div className="flex gap-4 mt-2 text-xs text-gray-500"><span>🟩 Estudió</span><span>⬜ No</span><span>🟥 Hoy</span></div>
 </div>
 </div>
 )}
 
 </div>
 
-{!enCurso&&<button onClick={()=>setModalReg(true)} className="fixed bottom-6 right-6 z-50 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl">➕</button>}
+{/* BOTON FLOTANTE */}
+{!enCurso&&!enPausa&&checkedIn&&(
+<button onClick={()=>setModalReg(true)} className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl text-white" style={{background:'#E24B4A'}}>➕</button>
+)}
 
+{/* CELEBRACION */}
+{celebData&&(
+<div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl p-5 text-center border-2 border-green-500" style={{minWidth:250}}>
+<div className={celebData.anim}><Robot bg={celebData.robot.bg} bd={celebData.robot.bd} size={56}/></div>
+<div className="font-bold text-gray-800 mt-2">{celebData.msg}</div>
+</div>
+)}
+
+{/* MODAL REGISTRO */}
 {modalReg&&(
 <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
-<div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-<div className="flex justify-between mb-4"><h3 className="text-xl font-extrabold">➕ Registrar</h3><button onClick={()=>setModalReg(false)} className="text-2xl text-gray-400">×</button></div>
+<div className="bg-white rounded-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto">
+<div className="flex justify-between mb-4"><h3 className="text-lg font-extrabold">➕ Registrar</h3><button onClick={()=>setModalReg(false)} className="text-2xl text-gray-400">×</button></div>
 <div className="space-y-3">
-<div><label className="block text-sm font-bold mb-1">Asignatura *</label>
+<div><label className="block text-sm font-bold mb-1">Asignatura</label>
 <select value={fm.asig} onChange={e=>setFm({...fm,asig:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl">
 <option value="">Seleccionar...</option>
-<option value="Matemática">🔢 Matemática</option><option value="Caligrafía">✍️ Caligrafía</option><option value="Sonidos">🔊 Sonidos</option>
-<option value="Ciencias">🧪 Ciencias</option><option value="Historia">📜 Historia</option><option value="Lectura">📖 Lectura</option><option value="Inglés">🇬🇧 Inglés</option>
+{['Matemática','Caligrafía','Sonidos','Ciencias','Historia','Lectura','Inglés'].map(a=><option key={a} value={a}>{ic[a]} {a}</option>)}
 </select></div>
-<div><label className="block text-sm font-bold mb-1">Páginas (ej: 74-75)</label><input type="text" placeholder="74-75" value={fm.pags} onChange={e=>setFm({...fm,pags:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl"/></div>
+<div><label className="block text-sm font-bold mb-1">Páginas</label><input type="text" placeholder="74-75" value={fm.pags} onChange={e=>setFm({...fm,pags:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl"/></div>
 <div><label className="block text-sm font-bold mb-1">Duración (min)</label><input type="number" placeholder="15" value={fm.dur} onChange={e=>setFm({...fm,dur:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl"/></div>
 <div><label className="block text-sm font-bold mb-1">Comprensión</label>
-<div className="flex gap-2">{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setFm({...fm,comp:n})} className={'flex-1 py-2 rounded-xl text-xl '+(fm.comp>=n?'bg-amber-100 border-2 border-amber-400':'bg-gray-100 border-2 border-transparent')}>⭐</button>))}</div></div>
+<div className="flex gap-2">{[1,2,3,4,5].map(n=><button key={n} onClick={()=>setFm({...fm,comp:n})} className={'flex-1 py-2 rounded-xl text-lg '+(fm.comp>=n?'bg-amber-100 border-2 border-amber-400':'bg-gray-100 border-2 border-transparent')}>⭐</button>)}</div></div>
 <div><label className="block text-sm font-bold mb-1">Notas</label><textarea placeholder="¿Qué aprendió?" value={fm.notas} onChange={e=>setFm({...fm,notas:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl h-20 resize-none"/></div>
-<div className="flex gap-2 pt-2"><button onClick={()=>setModalReg(false)} className="flex-1 px-4 py-3 border-2 rounded-xl font-bold text-gray-600">Cancelar</button>
-<button onClick={guardarManual} disabled={!fm.asig} className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl font-bold disabled:bg-gray-300">✅ Guardar</button></div>
+<div className="flex gap-2 pt-2"><button onClick={()=>setModalReg(false)} className="flex-1 py-3 border-2 rounded-xl font-bold text-gray-600">Cancelar</button>
+<button onClick={guardarManual} disabled={!fm.asig} className="flex-1 py-3 text-white rounded-xl font-bold disabled:bg-gray-300" style={{background:fm.asig?'#E24B4A':''}}>✅ Guardar</button></div>
 </div></div></div>
 )}
 
+{/* MODAL NOTAS AL FINALIZAR */}
 {modalNotas&&(
 <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
-<div className="bg-white rounded-2xl w-full max-w-md p-6">
-<h3 className="text-xl font-extrabold mb-1">✅ Completada</h3>
+<div className="bg-white rounded-xl w-full max-w-md p-5">
+<h3 className="text-lg font-extrabold mb-1">✅ Actividad completada</h3>
 <p className="text-sm text-gray-500 mb-4">{modalNotas.act.asignatura} • ⏱️ {modalNotas.dur} min</p>
 <div className="space-y-3">
 <div><label className="block text-sm font-bold mb-1">Comprensión</label>
-<div className="flex gap-2">{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setModalNotas({...modalNotas,comp:n})} className={'flex-1 py-2 rounded-xl text-xl '+(modalNotas.comp>=n?'bg-amber-100 border-2 border-amber-400':'bg-gray-100 border-2 border-transparent')}>⭐</button>))}</div>
-<div className="text-xs text-gray-500 text-center mt-1">{modalNotas.comp<=2?'Necesita refuerzo':modalNotas.comp<=3?'Regular':modalNotas.comp<=4?'Bien':'¡Excelente!'}</div></div>
-<div><label className="block text-sm font-bold mb-1">¿Qué aprendió?</label><textarea placeholder="Ej: Identificó seres vivos correctamente..." value={modalNotas.notas} onChange={e=>setModalNotas({...modalNotas,notas:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl h-20 resize-none"/></div>
-<button onClick={()=>guardar(modalNotas)} className="w-full px-4 py-3 bg-green-600 text-white rounded-xl font-bold text-lg">✅ Guardar Registro</button>
+<div className="flex gap-2">{[1,2,3,4,5].map(n=><button key={n} onClick={()=>setModalNotas({...modalNotas,comp:n})} className={'flex-1 py-2 rounded-xl text-lg '+(modalNotas.comp>=n?'bg-amber-100 border-2 border-amber-400':'bg-gray-100 border-2 border-transparent')}>⭐</button>)}</div>
+<div className="text-xs text-center text-gray-500 mt-1">{modalNotas.comp<=2?'Necesita refuerzo':modalNotas.comp<=3?'Regular':modalNotas.comp<=4?'Bien':'Excelente!'}</div></div>
+<div><label className="block text-sm font-bold mb-1">¿Qué aprendió?</label><textarea placeholder="Escribe aquí..." value={modalNotas.notas} onChange={e=>setModalNotas({...modalNotas,notas:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl h-20 resize-none"/></div>
+<button onClick={()=>guardar(modalNotas)} className="w-full py-3 text-white rounded-xl font-bold text-lg" style={{background:'#22c55e'}}>✅ Guardar registro</button>
 </div></div></div>
 )}
 
+{/* MODAL PREGUNTAS */}
 {modalPreg&&(
 <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
-<div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-<div className="flex justify-between mb-4"><h3 className="text-xl font-extrabold">❓ Preguntas</h3><button onClick={()=>setModalPreg(null)} className="text-2xl text-gray-400">×</button></div>
-<div className="bg-amber-50 border-l-4 border-amber-500 p-3 rounded-r-lg mb-4"><p className="text-sm text-amber-800 font-semibold">💡 Hazle estas preguntas ORALMENTE a Agustín</p></div>
-<div className="space-y-3">{modalPreg.map((p,i)=>(
-<div key={p.id} className="bg-blue-50 rounded-xl p-4">
-<div className="font-bold text-blue-900 mb-1">{i+1}. {p.pregunta}</div>
-{p.respuesta_esperada&&<div className="text-sm text-blue-700 bg-white rounded-lg p-2 mt-2"><span className="font-semibold">Respuesta:</span> {p.respuesta_esperada}</div>}
+<div className="bg-white rounded-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto">
+<div className="flex justify-between mb-4"><h3 className="text-lg font-extrabold">❓ Preguntas para Agustín</h3><button onClick={()=>setModalPreg(null)} className="text-2xl text-gray-400">×</button></div>
+<div className="bg-amber-50 border-l-3 border-amber-500 p-3 rounded mb-3" style={{borderLeft:'3px solid #f59e0b'}}><p className="text-sm text-amber-800 font-semibold">💡 Pregúntale ORALMENTE. Si le cuesta, dale pistas, no la respuesta.</p></div>
+{modalPreg.map((p,i)=>(
+<div key={p.id} className="bg-gray-50 rounded-xl p-4 mb-2">
+<div className="font-bold text-gray-800 mb-1">{i+1}. {p.pregunta}</div>
+<details className="mt-2"><summary className="text-sm text-blue-600 cursor-pointer">Ver respuesta esperada</summary><div className="text-sm text-gray-600 mt-1 bg-white rounded p-2">{p.respuesta_esperada}</div></details>
 </div>
-))}</div>
-<button onClick={()=>setModalPreg(null)} className="w-full mt-4 px-4 py-3 bg-blue-600 text-white rounded-xl font-bold">✅ Entendido</button>
+))}
+<button onClick={()=>setModalPreg(null)} className="w-full mt-3 py-3 text-white rounded-xl font-bold" style={{background:'#E24B4A'}}>✅ Entendido</button>
 </div></div>
 )}
+</div>);
+}
+
+// TIMER DE PAUSA
+function PauseTimer({inicio}){
+const [s,setS]=useState(0);
+useEffect(()=>{const i=setInterval(()=>setS(Math.floor((Date.now()-inicio)/1000)),1000);return()=>clearInterval(i);},[inicio]);
+const mins=Math.floor(s/60);
+const over=s>=600;
+return(
+<div className="mt-4">
+<div className={'text-2xl font-mono font-bold '+(over?'text-red-600':'text-purple-700')}>{Math.floor(s/60)}:{String(s%60).padStart(2,'0')}</div>
+{over&&<div className="text-red-600 font-bold text-sm mt-2 a-wiggle">⚠️ Agustín, llevas {mins} minutos! Vuelve a estudiar!</div>}
+</div>
+);
+}
+
+// VISTA SEMANAL
+function WeekView(){
+const [dias,setDias]=useState([]);
+useEffect(()=>{
+(async()=>{
+const inicio=new Date();inicio.setDate(inicio.getDate()-inicio.getDay()+1);
+const fin=new Date(inicio);fin.setDate(fin.getDate()+6);
+const{data}=await sb.from('cronograma').select('*').gte('fecha',inicio.toISOString().split('T')[0]).lte('fecha',fin.toISOString().split('T')[0]).order('fecha').order('orden');
+setDias(data||[]);
+})();
+},[]);
+const grouped=dias.reduce((ac,d)=>{if(!ac[d.fecha])ac[d.fecha]=[];ac[d.fecha].push(d);return ac;},{});
+const ic2={'Matemática':'🔢','Caligrafía':'✍️','Sonidos':'🔊','Ciencias':'🧪','Historia':'📜','Lectura':'📖','Inglés':'🇬🇧'};
+const hoy2=new Date().toISOString().split('T')[0];
+if(dias.length===0)return <p className="text-center py-4 text-gray-400">No hay actividades programadas esta semana</p>;
+return(
+<div className="space-y-3">
+{Object.entries(grouped).map(([f,acts])=>(
+<div key={f} className={'rounded-xl border overflow-hidden '+(f===hoy2?'border-red-400 bg-red-50':'border-gray-200')}>
+<div className={'px-4 py-2 text-sm font-bold '+(f===hoy2?'bg-red-100 text-red-800':'bg-gray-50 text-gray-700')}>
+{new Date(f+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'short'})}
+{f===hoy2&&' ← HOY'}
+</div>
+<div className="p-3 space-y-1">
+{acts.map(a=>(
+<div key={a.id} className="flex items-center gap-2 text-sm">
+<span>{a.completada?'✅':'⬜'}</span>
+<span className="font-medium">{ic2[a.asignatura]||'📚'} {a.asignatura}</span>
+{a.paginas&&<span className="text-gray-500">p.{a.paginas}</span>}
+{a.titulo&&<span className="text-gray-500 truncate">{a.titulo}</span>}
+</div>
+))}
+</div></div>
+))}
 </div>);
 }
 
