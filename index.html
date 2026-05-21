@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Agustin Aprende</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{font-family:'Nunito',sans-serif}
+body{background:#f0f4ff;margin:0}
+@keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 12px rgba(34,197,94,0)}}
+.tp{animation:pg 2s infinite}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback}=React;
+const sb=window.supabase.createClient('https://iqiplouocwzkjfohrykm.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxaXBsb3VvY3d6a2pmb2hyeWttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMTkzNTUsImV4cCI6MjA5NDg5NTM1NX0.VP25DZDmuXBnP8VVUO3qG2q3VNRQSu3q_2-gJkJXbvg');
+
+function App(){
+const [vista,setVista]=useState('dashboard');
+const [progreso,setProgreso]=useState([]);
+const [actHoy,setActHoy]=useState([]);
+const [historial,setHistorial]=useState([]);
+const [cargando,setCargando]=useState(true);
+const [err,setErr]=useState(null);
+const [enCurso,setEnCurso]=useState(null);
+const [tInicio,setTInicio]=useState(null);
+const [segs,setSegs]=useState(0);
+const [modalPreg,setModalPreg]=useState(null);
+const [modalReg,setModalReg]=useState(false);
+const [modalNotas,setModalNotas]=useState(null);
+const hoy=new Date().toISOString().split('T')[0];
+
+const cargar=useCallback(async()=>{
+try{
+setCargando(true);setErr(null);
+const {data:p}=await sb.from('progreso').select('*').order('asignatura');
+const {data:c}=await sb.from('cronograma').select('*').eq('fecha',hoy).order('orden');
+const {data:a}=await sb.from('actividades').select('*').eq('fecha',hoy).order('created_at',{ascending:false});
+const h30=new Date();h30.setDate(h30.getDate()-30);
+const {data:h}=await sb.from('actividades').select('*').gte('fecha',h30.toISOString().split('T')[0]).order('fecha',{ascending:false});
+setProgreso(p||[]);setActHoy(c||[]);setHistorial(h||[]);
+}catch(e){setErr('Error de conexion');}
+finally{setCargando(false);}
+},[hoy]);
+
+useEffect(()=>{cargar();},[cargar]);
+useEffect(()=>{
+let i;if(enCurso&&tInicio){i=setInterval(()=>setSegs(Math.floor((Date.now()-tInicio)/1000)),1000);}
+return()=>clearInterval(i);
+},[enCurso,tInicio]);
+
+const fmt=(s)=>{const m=Math.floor(s/60);return m+':'+String(s%60).padStart(2,'0');};
+const iniciar=(a)=>{setEnCurso(a);setTInicio(Date.now());setSegs(0);};
+const finalizar=()=>{if(!enCurso)return;setModalNotas({act:enCurso,dur:Math.max(1,Math.round(segs/60)),notas:'',comp:3});};
+
+const guardar=async(d)=>{
+try{
+const a=d.act;
+const pD=a.paginas?parseInt(a.paginas.split('-')[0]):null;
+const pH=a.paginas?parseInt(a.paginas.split('-')[1]):null;
+const nP=(pD&&pH)?(pH-pD+1):0;
+await sb.from('actividades').insert({fecha:hoy,asignatura:a.asignatura,titulo:a.titulo||null,tipo:a.tipo||'libro',paginas_desde:pD,paginas_hasta:pH,duracion_minutos:d.dur,notas:d.notas||null,comprension:d.comp,completada:true});
+const pr=progreso.find(p=>p.asignatura===a.asignatura);
+if(pr){await sb.from('progreso').update({paginas_completadas:pr.paginas_completadas+nP,actividades_completadas:pr.actividades_completadas+1,ultima_actividad:hoy,updated_at:new Date().toISOString()}).eq('asignatura',a.asignatura);}
+if(a.id){await sb.from('cronograma').update({completada:true}).eq('id',a.id);}
+setEnCurso(null);setTInicio(null);setSegs(0);setModalNotas(null);await cargar();
+}catch(e){alert('Error al guardar');}
+};
+
+const verPreg=async(c)=>{
+const {data}=await sb.from('preguntas').select('*').eq('clave',c).order('orden');
+setModalPreg(data||[]);
+};
+
+const [fm,setFm]=useState({asig:'',pags:'',dur:'',notas:'',comp:3});
+const guardarManual=async()=>{
+if(!fm.asig)return;
+try{
+const pD=fm.pags?parseInt(fm.pags.split('-')[0]):null;
+const pH=fm.pags?parseInt(fm.pags.split('-')[1]):null;
+const nP=(pD&&pH)?(pH-pD+1):0;
+await sb.from('actividades').insert({fecha:hoy,asignatura:fm.asig,tipo:'libro',paginas_desde:pD,paginas_hasta:pH,duracion_minutos:parseInt(fm.dur)||0,notas:fm.notas||null,comprension:fm.comp,completada:true});
+const pr=progreso.find(p=>p.asignatura===fm.asig);
+if(pr){await sb.from('progreso').update({paginas_completadas:pr.paginas_completadas+nP,actividades_completadas:pr.actividades_completadas+1,ultima_actividad:hoy,updated_at:new Date().toISOString()}).eq('asignatura',fm.asig);}
+setFm({asig:'',pags:'',dur:'',notas:'',comp:3});setModalReg(false);await cargar();
+}catch(e){alert('Error');}
+};
+
+const refuerzo=progreso.map(p=>{
+const pct=p.paginas_total>0?Math.round(p.paginas_completadas/p.paginas_total*100):0;
+return{...p,pct,niv:pct<20?'rojo':pct<50?'amarillo':'verde'};
+}).sort((a,b)=>a.pct-b.pct);
+
+if(cargando)return(<div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="text-6xl mb-4">📚</div><div className="text-xl font-bold text-blue-800">Cargando...</div></div></div>);
+if(err)return(<div className="min-h-screen flex items-center justify-center p-4"><div className="text-center"><div className="text-5xl mb-4">⚠️</div><div className="text-red-800 font-bold mb-4">{err}</div><button onClick={cargar} className="px-6 py-2 bg-red-600 text-white rounded-lg">🔄 Reintentar</button></div></div>);
+
+const compHoy=historial.filter(h=>h.fecha===hoy);
+const ic={'Matemática':'🔢','Caligrafía':'✍️','Sonidos':'🔊','Ciencias':'🧪','Historia':'📜','Lectura':'📖','Inglés':'🇬🇧'};
+
+return(
+<div className="min-h-screen bg-blue-50 pb-24">
+<div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 shadow-lg">
+<h1 className="text-2xl font-extrabold">📚 Agustín Aprende</h1>
+<p className="text-blue-200 text-sm mt-1">{new Date().toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+<div className="mt-2 flex gap-4 text-sm"><span>✅ {compHoy.length} completadas</span><span>📋 {actHoy.filter(a=>!a.completada).length} pendientes</span></div>
+</div>
+
+<div className="flex bg-white shadow-sm border-b sticky top-0 z-40">
+{[{k:'dashboard',i:'📊',l:'Hoy'},{k:'progreso',i:'📈',l:'Progreso'},{k:'historial',i:'📝',l:'Historial'},{k:'refuerzo',i:'🎯',l:'Reforzar'}].map(t=>(
+<button key={t.k} onClick={()=>setVista(t.k)} className={'flex-1 py-3 text-center text-sm font-bold '+(vista===t.k?'text-blue-700 bg-blue-50':'text-gray-500')} style={vista===t.k?{borderBottom:'3px solid #2563eb'}:{}}>{t.i} {t.l}</button>
+))}
+</div>
+
+<div className="p-4 max-w-2xl mx-auto">
+
+{vista==='dashboard'&&(
+<div className="space-y-4">
+{enCurso&&(
+<div className="bg-green-50 border-2 border-green-500 rounded-2xl p-5 tp">
+<div className="flex justify-between items-start">
+<div><div className="text-xs font-bold text-green-600 uppercase">⏱️ En Curso</div>
+<div className="text-xl font-extrabold text-green-900 mt-1">{enCurso.asignatura}</div>
+{enCurso.titulo&&<div className="text-sm text-green-700">{enCurso.titulo}</div>}
+{enCurso.paginas&&<div className="text-sm text-green-600">Páginas {enCurso.paginas}</div>}
+</div>
+<div className="text-right"><div className="text-4xl font-mono font-extrabold text-green-800">{fmt(segs)}</div><div className="text-xs text-green-600 mt-1">minutos</div></div>
+</div>
+<button onClick={finalizar} className="w-full mt-4 px-4 py-3 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700">⏹️ FINALIZAR ACTIVIDAD</button>
+</div>
+)}
+
+<div className="bg-white rounded-2xl shadow-sm p-5">
+<h2 className="text-lg font-extrabold text-gray-800 mb-4">📋 Actividades de Hoy</h2>
+{actHoy.length===0?(<div className="text-center py-8 text-gray-400"><div className="text-4xl mb-2">📅</div><p>No hay actividades para hoy</p></div>):(
+<div className="space-y-3">
+{actHoy.map(act=>{
+const done=act.completada||compHoy.some(a=>a.asignatura===act.asignatura&&a.titulo===act.titulo);
+const ec=enCurso&&enCurso.id===act.id;
+return(
+<div key={act.id} className={'rounded-xl p-4 border-l-4 '+(done?'bg-gray-50 border-gray-300 opacity-70':ec?'bg-green-50 border-green-500':'bg-white border-blue-500 shadow-sm')}>
+<div className="flex items-center gap-2">
+{done&&<span className="text-xl">✅</span>}
+<span className={'font-bold '+(done?'text-gray-500 line-through':'text-gray-800')}>{act.asignatura}</span>
+<span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">{act.tiempo_estimado}</span>
+</div>
+{act.paginas&&<div className="text-sm text-gray-500 mt-1">Páginas {act.paginas}</div>}
+{act.titulo&&<div className="text-sm text-gray-700 mt-1 font-medium">{act.titulo}</div>}
+{!done&&!ec&&(
+<div className="flex flex-wrap gap-2 mt-3">
+{act.link&&<a href={act.link} target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-red-500 text-white text-sm rounded-lg font-semibold">▶️ {act.tipo==='video'?'Ver Video':'Abrir'}</a>}
+{act.preguntas_clave&&<button onClick={()=>verPreg(act.preguntas_clave)} className="px-3 py-2 bg-amber-500 text-white text-sm rounded-lg font-semibold">❓ Preguntas</button>}
+{!enCurso&&<button onClick={()=>iniciar(act)} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg font-bold">▶️ INICIAR</button>}
+</div>
+)}
+</div>);
+})}
+</div>
+)}
+</div>
+
+<div className="bg-white rounded-2xl shadow-sm p-5">
+<h2 className="text-lg font-extrabold text-gray-800 mb-3">📈 Progreso</h2>
+<div className="space-y-2">
+{progreso.map(p=>{
+const pct=p.paginas_total>0?Math.round(p.paginas_completadas/p.paginas_total*100):0;
+return(<div key={p.id} className="flex items-center gap-3">
+<span className="text-sm font-semibold w-24 truncate">{ic[p.asignatura]||'📚'} {p.asignatura}</span>
+<div className="flex-1 bg-gray-200 rounded-full h-2.5"><div className="h-2.5 rounded-full" style={{width:pct+'%',backgroundColor:pct>=60?'#22c55e':pct>=30?'#f59e0b':'#ef4444'}}/></div>
+<span className="text-xs text-gray-500 w-12 text-right">{pct}%</span>
+</div>);
+})}
+</div>
+</div>
+</div>
+)}
+
+{vista==='progreso'&&(
+<div className="space-y-4">
+<div className="bg-white rounded-2xl shadow-sm p-5">
+<h2 className="text-lg font-extrabold text-gray-800 mb-4">📊 Progreso Detallado</h2>
+{progreso.map(p=>{
+const pct=p.paginas_total>0?Math.round(p.paginas_completadas/p.paginas_total*100):0;
+const col=pct>=60?'#16a34a':pct>=30?'#d97706':'#dc2626';
+return(<div key={p.id} className="bg-gray-50 rounded-xl p-4 mb-3">
+<div className="flex justify-between items-center mb-2"><span className="text-lg font-bold">{ic[p.asignatura]||'📚'} {p.asignatura}</span><span className="text-2xl font-extrabold" style={{color:col}}>{pct}%</span></div>
+<div className="w-full bg-gray-200 rounded-full h-4 mb-2"><div className="h-4 rounded-full" style={{width:pct+'%',backgroundColor:col}}/></div>
+<div className="flex justify-between text-xs text-gray-500"><span>{p.paginas_completadas}/{p.paginas_total}</span><span>{p.actividades_completadas} sesiones</span></div>
+</div>);
+})}
+</div>
+<div className="bg-white rounded-2xl shadow-sm p-5">
+<h2 className="text-lg font-extrabold text-gray-800 mb-3">📅 Esta Semana</h2>
+<div className="grid grid-cols-2 gap-3">
+<div className="bg-blue-50 rounded-xl p-4 text-center"><div className="text-3xl font-extrabold text-blue-700">{historial.filter(h=>(Date.now()-new Date(h.fecha))/864e5<=7).length}</div><div className="text-xs text-blue-600 font-semibold">Actividades</div></div>
+<div className="bg-green-50 rounded-xl p-4 text-center"><div className="text-3xl font-extrabold text-green-700">{historial.filter(h=>(Date.now()-new Date(h.fecha))/864e5<=7).reduce((s,h)=>s+(h.duracion_minutos||0),0)} min</div><div className="text-xs text-green-600 font-semibold">Tiempo Total</div></div>
+</div>
+</div>
+</div>
+)}
+
+{vista==='historial'&&(
+<div className="bg-white rounded-2xl shadow-sm p-5">
+<h2 className="text-lg font-extrabold text-gray-800 mb-4">📝 Diario de Aprendizaje</h2>
+{historial.length===0?(<div className="text-center py-8 text-gray-400"><p>Sin actividades registradas</p></div>):(
+<div className="space-y-3">
+{Object.entries(historial.reduce((ac,a)=>{if(!ac[a.fecha])ac[a.fecha]=[];ac[a.fecha].push(a);return ac;},{})).map(([f,as])=>(
+<div key={f} className="border rounded-xl overflow-hidden">
+<div className="bg-blue-50 px-4 py-2 font-bold text-blue-800 text-sm">📅 {new Date(f+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}</div>
+<div className="divide-y">{as.map(a=>(
+<div key={a.id} className="px-4 py-3">
+<div className="flex justify-between"><div><span className="font-bold">{a.asignatura}</span>{a.titulo&&<span className="text-gray-500 text-sm ml-2">• {a.titulo}</span>}</div>
+<div className="text-sm text-right">{a.duracion_minutos>0&&<div className="text-green-600 font-semibold">⏱️ {a.duracion_minutos}min</div>}{a.comprension&&<div className="text-amber-500">{'⭐'.repeat(a.comprension)}</div>}</div></div>
+{a.paginas_desde&&<div className="text-xs text-gray-500 mt-1">Pág {a.paginas_desde}-{a.paginas_hasta}</div>}
+{a.notas&&<div className="text-sm mt-1 bg-yellow-50 p-2 rounded">💬 {a.notas}</div>}
+</div>
+))}</div>
+</div>
+))}
+</div>
+)}
+</div>
+)}
+
+{vista==='refuerzo'&&(
+<div className="space-y-4">
+<div className="bg-white rounded-2xl shadow-sm p-5">
+<h2 className="text-lg font-extrabold text-gray-800 mb-4">🎯 Áreas a Reforzar</h2>
+{refuerzo.map(r=>(
+<div key={r.id} className={'rounded-xl p-4 border-l-4 mb-3 '+(r.niv==='rojo'?'bg-red-50 border-red-500':r.niv==='amarillo'?'bg-amber-50 border-amber-500':'bg-green-50 border-green-500')}>
+<div className="flex justify-between items-center">
+<div><div className="font-bold">{r.asignatura}</div><div className="text-sm text-gray-600">{r.paginas_completadas}/{r.paginas_total} • {r.actividades_completadas} sesiones</div></div>
+<div className="text-right"><div className={'text-2xl font-extrabold '+(r.niv==='rojo'?'text-red-600':r.niv==='amarillo'?'text-amber-600':'text-green-600')}>{r.pct}%</div><div className="text-xs text-gray-500">{r.niv==='rojo'?'🔴 Prioridad':r.niv==='amarillo'?'🟡 Atención':'🟢 Bien'}</div></div>
+</div></div>
+))}
+</div>
+<div className="bg-white rounded-2xl shadow-sm p-5">
+<h2 className="text-lg font-extrabold text-gray-800 mb-3">🔥 Racha</h2>
+<div className="flex gap-1 flex-wrap">
+{Array.from({length:14},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(13-i));const f=d.toISOString().split('T')[0];const t=historial.some(h=>h.fecha===f);
+return(<div key={f} className={'w-8 h-8 rounded flex items-center justify-center text-xs font-bold '+(t?'bg-green-500 text-white':f===hoy?'bg-blue-100 text-blue-700 border-2 border-blue-400':'bg-gray-100 text-gray-400')}>{d.getDate()}</div>);
+})}
+</div>
+<div className="flex gap-4 mt-2 text-xs text-gray-500"><span>🟩 Estudió</span><span>⬜ No</span><span>🔵 Hoy</span></div>
+</div>
+</div>
+)}
+
+</div>
+
+{!enCurso&&<button onClick={()=>setModalReg(true)} className="fixed bottom-6 right-6 z-50 bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl">➕</button>}
+
+{modalReg&&(
+<div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+<div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+<div className="flex justify-between mb-4"><h3 className="text-xl font-extrabold">➕ Registrar</h3><button onClick={()=>setModalReg(false)} className="text-2xl text-gray-400">×</button></div>
+<div className="space-y-3">
+<div><label className="block text-sm font-bold mb-1">Asignatura *</label>
+<select value={fm.asig} onChange={e=>setFm({...fm,asig:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl">
+<option value="">Seleccionar...</option>
+<option value="Matemática">🔢 Matemática</option><option value="Caligrafía">✍️ Caligrafía</option><option value="Sonidos">🔊 Sonidos</option>
+<option value="Ciencias">🧪 Ciencias</option><option value="Historia">📜 Historia</option><option value="Lectura">📖 Lectura</option><option value="Inglés">🇬🇧 Inglés</option>
+</select></div>
+<div><label className="block text-sm font-bold mb-1">Páginas (ej: 74-75)</label><input type="text" placeholder="74-75" value={fm.pags} onChange={e=>setFm({...fm,pags:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl"/></div>
+<div><label className="block text-sm font-bold mb-1">Duración (min)</label><input type="number" placeholder="15" value={fm.dur} onChange={e=>setFm({...fm,dur:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl"/></div>
+<div><label className="block text-sm font-bold mb-1">Comprensión</label>
+<div className="flex gap-2">{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setFm({...fm,comp:n})} className={'flex-1 py-2 rounded-xl text-xl '+(fm.comp>=n?'bg-amber-100 border-2 border-amber-400':'bg-gray-100 border-2 border-transparent')}>⭐</button>))}</div></div>
+<div><label className="block text-sm font-bold mb-1">Notas</label><textarea placeholder="¿Qué aprendió?" value={fm.notas} onChange={e=>setFm({...fm,notas:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl h-20 resize-none"/></div>
+<div className="flex gap-2 pt-2"><button onClick={()=>setModalReg(false)} className="flex-1 px-4 py-3 border-2 rounded-xl font-bold text-gray-600">Cancelar</button>
+<button onClick={guardarManual} disabled={!fm.asig} className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl font-bold disabled:bg-gray-300">✅ Guardar</button></div>
+</div></div></div>
+)}
+
+{modalNotas&&(
+<div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+<div className="bg-white rounded-2xl w-full max-w-md p-6">
+<h3 className="text-xl font-extrabold mb-1">✅ Completada</h3>
+<p className="text-sm text-gray-500 mb-4">{modalNotas.act.asignatura} • ⏱️ {modalNotas.dur} min</p>
+<div className="space-y-3">
+<div><label className="block text-sm font-bold mb-1">Comprensión</label>
+<div className="flex gap-2">{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setModalNotas({...modalNotas,comp:n})} className={'flex-1 py-2 rounded-xl text-xl '+(modalNotas.comp>=n?'bg-amber-100 border-2 border-amber-400':'bg-gray-100 border-2 border-transparent')}>⭐</button>))}</div>
+<div className="text-xs text-gray-500 text-center mt-1">{modalNotas.comp<=2?'Necesita refuerzo':modalNotas.comp<=3?'Regular':modalNotas.comp<=4?'Bien':'¡Excelente!'}</div></div>
+<div><label className="block text-sm font-bold mb-1">¿Qué aprendió?</label><textarea placeholder="Ej: Identificó seres vivos correctamente..." value={modalNotas.notas} onChange={e=>setModalNotas({...modalNotas,notas:e.target.value})} className="w-full px-3 py-2.5 border-2 rounded-xl h-20 resize-none"/></div>
+<button onClick={()=>guardar(modalNotas)} className="w-full px-4 py-3 bg-green-600 text-white rounded-xl font-bold text-lg">✅ Guardar Registro</button>
+</div></div></div>
+)}
+
+{modalPreg&&(
+<div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+<div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+<div className="flex justify-between mb-4"><h3 className="text-xl font-extrabold">❓ Preguntas</h3><button onClick={()=>setModalPreg(null)} className="text-2xl text-gray-400">×</button></div>
+<div className="bg-amber-50 border-l-4 border-amber-500 p-3 rounded-r-lg mb-4"><p className="text-sm text-amber-800 font-semibold">💡 Hazle estas preguntas ORALMENTE a Agustín</p></div>
+<div className="space-y-3">{modalPreg.map((p,i)=>(
+<div key={p.id} className="bg-blue-50 rounded-xl p-4">
+<div className="font-bold text-blue-900 mb-1">{i+1}. {p.pregunta}</div>
+{p.respuesta_esperada&&<div className="text-sm text-blue-700 bg-white rounded-lg p-2 mt-2"><span className="font-semibold">Respuesta:</span> {p.respuesta_esperada}</div>}
+</div>
+))}</div>
+<button onClick={()=>setModalPreg(null)} className="w-full mt-4 px-4 py-3 bg-blue-600 text-white rounded-xl font-bold">✅ Entendido</button>
+</div></div>
+)}
+</div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
