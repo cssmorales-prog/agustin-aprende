@@ -68,7 +68,7 @@ try{
 const a=d.act;
 const pD=a.paginas?parseInt(a.paginas.split('-')[0]):null;
 const pH=a.paginas?parseInt(a.paginas.split('-')[1]):null;
-const nP=(pD&&pH)?(pH-pD+1):0;
+const nP=(pD&&pH)?(pH-pD+1):1;
 await sb.from('actividades').insert({fecha:hoy,asignatura:a.asignatura,titulo:a.titulo||null,tipo:a.tipo||'libro',paginas_desde:pD,paginas_hasta:pH,duracion_minutos:d.dur,notas:d.notas||null,comprension:d.comp,completada:true});
 const pr=progreso.find(p=>p.asignatura===a.asignatura);
 if(pr){await sb.from('progreso').update({paginas_completadas:pr.paginas_completadas+nP,actividades_completadas:pr.actividades_completadas+1,ultima_actividad:hoy,updated_at:new Date().toISOString()}).eq('asignatura',a.asignatura);}
@@ -88,7 +88,7 @@ if(!fm.asig)return;
 try{
 const pD=fm.pags?parseInt(fm.pags.split('-')[0]):null;
 const pH=fm.pags?parseInt(fm.pags.split('-')[1]):null;
-const nP=(pD&&pH)?(pH-pD+1):0;
+const nP=(pD&&pH)?(pH-pD+1):1;
 await sb.from('actividades').insert({fecha:hoy,asignatura:fm.asig,tipo:'libro',paginas_desde:pD,paginas_hasta:pH,duracion_minutos:parseInt(fm.dur)||0,notas:fm.notas||null,comprension:fm.comp,completada:true});
 const pr=progreso.find(p=>p.asignatura===fm.asig);
 if(pr){await sb.from('progreso').update({paginas_completadas:pr.paginas_completadas+nP,actividades_completadas:pr.actividades_completadas+1,ultima_actividad:hoy,updated_at:new Date().toISOString()}).eq('asignatura',fm.asig);}
